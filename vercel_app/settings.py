@@ -79,13 +79,22 @@ WSGI_APPLICATION = 'vercel_app.wsgi.application'
 
 # DATABASES = {}
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'csdl_pccc',
+        'USER': 'duongcntt96',
+        'HOST': 'duongcntt96.mysql.pythonanywhere-services.com',
+        'PASSWORD': '19961996',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
