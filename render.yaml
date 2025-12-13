@@ -1,0 +1,41 @@
+services:
+  - type: psql
+    name: pc07tayninhbackend-db
+    plan: free
+    databaseName: pc07tayninhbackend
+    user: pc07tayninhbackend
+  - type: web
+    name: pc07tayninhbackend-web
+    env: python
+    region: oregon
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn core.wsgi:application -c gunicorn.conf.py"
+    healthCheckPath: /health/
+    numInstances: 1
+    plan: free # Consider upgrading for production
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.5"
+      - key: DJANGO_SETTINGS_MODULE
+        value: core.settings
+      - key: SECRET_KEY
+        generateValue: true # Render will generate a strong secret key
+      - key: DATABASE_URL
+        fromDatabase: # Automatically connect to the PostgreSQL service
+          name: pc07tayninhbackend-db
+          property: connectionString
+      - key: WEB_CONCURRENCY
+        value: "4" # Adjust based on instance type and workload
+      - key: DEBUG
+        value: "False"
+      - key: DISABLE_COLLECTSTATIC
+        value: "0" # Ensure collectstatic runs in build.sh
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: admin # Default username for superuser
+        sync: false # Set to false to avoid updating on every blueprint sync. Manual update recommended.
+      - key: DJANGO_SUPERUSER_EMAIL
+        value: admin@example.com # Default email for superuser
+        sync: false # Set to false. Manual update recommended.
+      - key: DJANGO_SUPERUSER_PASSWORD
+        value: <your-secure-password> # REQUIRED - Set this manually in Render dashboard env vars
+        sync: false # Set to false. Manual update recommended.
