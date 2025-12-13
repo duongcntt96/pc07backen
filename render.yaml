@@ -1,9 +1,4 @@
 services:
-  - type: psql
-    name: pc07tayninhbackend-db
-    plan: free
-    databaseName: pc07tayninhbackend
-    user: pc07tayninhbackend
   - type: web
     name: pc07tayninhbackend-web
     env: python
