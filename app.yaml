@@ -1,0 +1,19 @@
+runtime: python312  # Hoặc 39, 310, 311 tùy version bạn code
+instance_class: F1
+
+env_variables:
+  DJANGO_SETTINGS_MODULE: vercel_app.settings
+  DATABASE_URL: "postgresql://postgres.esneqgycauidtjjvyanh:QWERTyuiopASDFGhjklZXCVBnm@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
+  SECRET_KEY: "$!@#$%^&*GiaMinh02062024!@#$%^&*"
+
+# Cấu hình để phục vụ các file CSS, JS, hình ảnh (Static files)
+
+handlers:
+- url: /static
+  static_dir: staticfiles/
+- url: /.*
+  script: auto
+
+
+# Lệnh chạy server
+entrypoint: gunicorn -b :$PORT vercel_app.wsgi:application
