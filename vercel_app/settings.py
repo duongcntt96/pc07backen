@@ -42,7 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'example',
-    'qlpt'
+    'qlpt',
+    'user',
+    'django_filters',
 ]
 
 MIDDLEWARE = [
@@ -51,7 +53,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -88,10 +89,16 @@ WSGI_APPLICATION = 'vercel_app.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
+        default="postgresql://postgres.esneqgycauidtjjvyanh:QWERTyuiopASDFGhjklZXCVBnm@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres",
         conn_max_age=600
     )
 }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 # DATABASES = {
 #     'default': {
