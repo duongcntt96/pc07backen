@@ -1,10 +1,10 @@
 from rest_framework import viewsets
-from ..models import PhuongTien
-from .serializers import PhuongTienSerializer
+from ..models import PhuongTienHuHong
+from .serializers import PhuongTienHuHongSerializer
 
-class PhuongTienViewSet(viewsets.ModelViewSet):
-    queryset = PhuongTien.objects.all()
-    serializer_class = PhuongTienSerializer
+class PhuongTienHuHongViewSet(viewsets.ModelViewSet):
+    queryset = PhuongTienHuHong.objects.all()
+    serializer_class = PhuongTienHuHongSerializer
 
 
 

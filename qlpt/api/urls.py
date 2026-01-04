@@ -1,5 +1,5 @@
 from django.urls import path, include
-from .views import PhuongTienViewSet
+from .views import PhuongTienHuHongViewSet
 
 
 
@@ -9,13 +9,13 @@ from .views import Thuc_luc, Ton_kho, Text_to_speak
 
 router = DefaultRouter()
 
-# router.register('phuongtien', PhuongTienViewSet)
 router.register('chungloai', Chung_loai_viewSet)
 router.register('kho', Danh_muc_kho_viewSet)
 router.register('nguoncap', Danh_muc_nguon_cap_viewSet)
 router.register('phieunhap', Phieu_nhap_ViewSet)
 router.register('chitietphieunhap', Chi_tiet_phieu_nhap_ViewSet)
 router.register('tailieuphuongtien', Tai_lieu_phuong_tien_viewSet)
+router.register('huhong', PhuongTienHuHongViewSet)
 
 urlpatterns = [
     path('/', include(router.urls)),

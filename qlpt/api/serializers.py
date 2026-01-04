@@ -1,9 +1,9 @@
 from rest_framework import serializers
-from ..models import PhuongTien
+from ..models import PhuongTienHuHong
 
-class PhuongTienSerializer(serializers.ModelSerializer):
+class PhuongTienHuHongSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PhuongTien
+        model = PhuongTienHuHong
         fields = '__all__'
 
 

@@ -1,6 +1,6 @@
 from django.db import models
 
-class PhuongTien(models.Model):
+class PhuongTienHuHong(models.Model):
     don_vi_quan_ly = models.CharField(max_length=255)
     loai_phuong_tien = models.CharField(max_length=255)
     nhan_hieu = models.CharField(max_length=255)
@@ -142,7 +142,7 @@ class Chi_tiet_phieu_nhap(models.Model):
     class Meta:
         verbose_name = 'Chi tiết phiếu nhập'
         verbose_name_plural = 'Chi tiết phiếu nhập'
-        
+
     def save(self, *args, **kwargs):
         if self.phieu_nhap.kho_xuat:
             nhap = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_nhap=self.phieu_nhap.kho_xuat,chung_loai=self.chung_loai,ten=self.ten).aggregate(totals=Sum('so_luong'))
