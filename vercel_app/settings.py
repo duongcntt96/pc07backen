@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'qlpt',
     'user',
     'django_filters',
+
 ]
 
 MIDDLEWARE = [
@@ -152,5 +153,19 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'api.paginations.DefaultCustomPagination',
+
+    # # Custom datetime format
+    # 'DATE_FORMAT' : '%d/%m/%Y',
+    # 'DATETIME_FORMAT' : '%d/%m/%Y %HH:%mm',
+}
 
 CORS_ALLOW_ALL_ORIGINS = True

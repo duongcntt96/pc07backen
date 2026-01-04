@@ -1,5 +1,5 @@
 from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 from .views import RegisterAPIView, cap_bac_ViewSet, chuc_vu_ViewSet, bo_phan_ViewSet, UserProfileViewSet, UserViewSet, GroupViewSet
 
 
@@ -9,7 +9,7 @@ from rest_framework_simplejwt.views import (
 )
 from .customToken import MyTokenObtainPairView
 
-router = DefaultRouter()
+router = SimpleRouter()
 
 router.register('capbac', cap_bac_ViewSet)
 router.register('chucvu', chuc_vu_ViewSet)
