@@ -134,14 +134,8 @@ class Danh_muc_nguon_cap_viewSet(viewsets.ModelViewSet):
     # permission_classes = [permissions.IsAuthenticated]
 
 class Chung_loai_viewSet(viewsets.ModelViewSet):
-    queryset = Chung_loai.objects.filter(parent__isnull=True).prefetch_related('children')
+    queryset = Chung_loai.objects.filter(parent__isnull=True)
     serializer_class = Chung_loaiSerializer
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        depth = self.request.query_params.get('depth', None)
-        if depth is not None:
-            context['depth'] = int(depth)
-        return context
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     # permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

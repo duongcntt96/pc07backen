@@ -83,8 +83,5 @@ class Chung_loaiSerializer(serializers.ModelSerializer):
         model = Chung_loai
         fields = ("id","ten","maso","children")
     def get_children(self,obj):
-        depth = self.context.get('depth', None)
-        if depth is not None and depth <= 0:
-            return []
-        serializer = Chung_loaiSerializer(instance=obj.children,many=True, context={'depth': depth - 1 if depth is not None else None})
+        serializer = Chung_loaiSerializer(instance=obj.children,many=True)
         return serializer.data
