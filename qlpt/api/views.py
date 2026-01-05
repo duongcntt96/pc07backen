@@ -28,7 +28,8 @@ from rest_framework.views import APIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, F, Count, Value, Sum
+from django.db.models import Q, F, Count, Value, Sum, Case, When, IntegerField
+from django.db import models
 
 
 
@@ -41,52 +42,65 @@ class Thuc_luc(APIView):
     def get(self, request):
         # Filter params
         chung_loai = request.query_params.get('chung_loai')
-        kho_nhap = request.query_params.get('kho_nhap')
-        success = request.query_params.get('success') or True
-        parent = request.query_params.get('kho_nhap__parent') or 1
-        kho_is_active = True
-        if kho_nhap:
-            parent = kho_nhap
-            kho_is_active = Danh_muc_kho.objects.get(id=kho_nhap).active
-        # Get queryset
-        List_PT_nhap = Chi_tiet_phieu_nhap.objects.order_by('ten').filter(
-                        Q(phieu_nhap__kho_nhap=parent) |
-                        Q(phieu_nhap__kho_nhap__parent=parent) |
-                        Q(phieu_nhap__kho_nhap__parent__parent=parent),
-                        phieu_nhap__success=success,
-                        phieu_nhap__kho_nhap__active=kho_is_active
-                        ).exclude(
-                        Q(phieu_nhap__kho_xuat=parent) |
-                        Q(phieu_nhap__kho_xuat__parent=parent) |
-                        Q(phieu_nhap__kho_xuat__parent__parent=parent)
-                        ).values('chung_loai__maso','chung_loai', 'ten').annotate(totals = Sum('so_luong'))
+        kho_nhap_id = request.query_params.get('kho_nhap')
+        success_status = request.query_params.get('success', True)
 
-        List_PT_xuat = Chi_tiet_phieu_nhap.objects.filter(
-                        Q(phieu_nhap__kho_xuat=parent) |
-                        Q(phieu_nhap__kho_xuat__parent=parent) |
-                        Q(phieu_nhap__kho_xuat__parent__parent=parent),
-                        phieu_nhap__success=success
-                        ).exclude(
-                        Q(phieu_nhap__kho_nhap=parent) |
-                        Q(phieu_nhap__kho_nhap__parent=parent) |
-                        Q(phieu_nhap__kho_nhap__parent__parent=parent)
-                        ).values('chung_loai', 'ten').annotate(totals = Sum('so_luong'))
+        queryset = Chi_tiet_phieu_nhap.objects.all()
+
+        # Build a list of all relevant kho_nhap (including children)
+        if kho_nhap_id:
+            try:
+                target_kho = Danh_muc_kho.objects.get(id=kho_nhap_id)
+                # Get all descendants of the target_kho
+                descendant_kho_ids = [target_kho.id]  # Include the target kho itself
+
+                # Recursive function to get all children
+                def get_children_ids(kho_item):
+                    for child in kho_item.children.all():
+                        descendant_kho_ids.append(child.id)
+                        get_children_ids(child)
+
+                get_children_ids(target_kho)
+                queryset = queryset.filter(phieu_nhap__kho_nhap__in=descendant_kho_ids)
+
+            except Danh_muc_kho.DoesNotExist:
+                return Response({'error': 'Kho nhập not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Filter by success status
+        queryset = queryset.filter(phieu_nhap__success=success_status)
+
+        # Annotate with import and export totals
+        queryset = queryset.values('chung_loai__maso', 'chung_loai', 'ten').annotate(
+            nhap_totals=Sum(
+                Case(
+                    When(phieu_nhap__kho_nhap__in=descendant_kho_ids, then='so_luong'),
+                    default=Value(0),
+                    output_field=models.IntegerField()
+                )
+            ),
+            xuat_totals=Sum(
+                Case(
+                    When(phieu_nhap__kho_xuat__in=descendant_kho_ids, then='so_luong'),
+                    default=Value(0),
+                    output_field=models.IntegerField()
+                )
+            )
+        ).annotate(
+            totals=F('nhap_totals') - F('xuat_totals')
+        ).filter(totals__gt=0).order_by('ten')
+
         # Filter by chung_loai
         if chung_loai:
-            ma_so = Chung_loai.objects.get(id=chung_loai).maso
-            List_PT_nhap=List_PT_nhap.filter(chung_loai__maso__icontains=ma_so)
-            List_PT_xuat=List_PT_xuat.filter(chung_loai__maso__icontains=ma_so)
-        # Merge data
-        _count = 0
-        _sum = 0
-        for pt in List_PT_nhap:
-            _xuat = List_PT_xuat.filter(chung_loai=pt['chung_loai'],ten=pt['ten'])
-            if _xuat:
-                pt['totals'] = pt['totals']-_xuat[0]['totals']
-            if pt['totals']:
-                _count = _count + 1
-                _sum = _sum + pt['totals']
-        return Response({'kho_nhap':kho_nhap,'sum': _sum, 'count': _count, 'data': List_PT_nhap}, status=status.HTTP_200_OK)
+            try:
+                ma_so = Chung_loai.objects.get(id=chung_loai).maso
+                queryset = queryset.filter(chung_loai__maso__icontains=ma_so)
+            except Chung_loai.DoesNotExist:
+                return Response({'error': 'Chủng loại not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        _count = queryset.count()
+        _sum = queryset.aggregate(total_sum=Sum('totals'))['total_sum'] or 0
+
+        return Response({'kho_nhap': kho_nhap_id, 'sum': _sum, 'count': _count, 'data': list(queryset)}, status=status.HTTP_200_OK)
 
 class Ton_kho(APIView):
     def get(self, request):
@@ -120,8 +134,14 @@ class Danh_muc_nguon_cap_viewSet(viewsets.ModelViewSet):
     # permission_classes = [permissions.IsAuthenticated]
 
 class Chung_loai_viewSet(viewsets.ModelViewSet):
-    queryset = Chung_loai.objects.filter(parent__isnull=True)
+    queryset = Chung_loai.objects.filter(parent__isnull=True).prefetch_related('children')
     serializer_class = Chung_loaiSerializer
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        depth = self.request.query_params.get('depth', None)
+        if depth is not None:
+            context['depth'] = int(depth)
+        return context
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     # permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
