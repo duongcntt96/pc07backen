@@ -7,10 +7,6 @@ class PhuongTienHuHongViewSet(viewsets.ModelViewSet):
     serializer_class = PhuongTienHuHongSerializer
 
 
-
-
-
-
 from datetime import datetime
 # Import Serializer
 from .serializers import Chung_loaiSerializer, Danh_muc_kho_Serializer, Danh_muc_nguon_cap_Serializer, Chi_tiet_phieu_nhap_Serializer, Phieu_nhap_Serializer
@@ -30,6 +26,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, F, Count, Value, Sum, Case, When, IntegerField
 from django.db import models
+
+
+# views.py trong ViewSet của bạn
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 
 
@@ -140,6 +141,28 @@ class Chung_loai_viewSet(viewsets.ModelViewSet):
     # permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['parent','children']
+    # views.py trong ViewSet của bạn
+    @action(detail=False, methods=['post'])
+    def bulk_create_chungloai(self, request):
+        data = request.data  # Danh sách mảng từ Frontend gửi lên
+        created_list = []
+        
+        for item in data:
+            parent = None
+            if item.get('parent_maso'):
+                parent = Chung_loai.objects.filter(maso=item['parent_maso']).first()
+            
+            # Tạo đối tượng nhưng chưa lưu xuống DB ngay
+            new_obj = Chung_loai(
+                ten=item['ten'],
+                parent=parent
+            )
+            # Lưu ý: Vì bạn có logic tự sinh mã số trong hàm save(), 
+            # nên sử dụng .save() thay vì bulk_create để đảm bảo logic mã số được chạy đúng.
+            new_obj.save() 
+            created_list.append(new_obj.id)
+
+        return Response({"status": "success", "count": len(created_list)})
     
 class Tai_lieu_phuong_tien_viewSet(viewsets.ModelViewSet):
     queryset = Tai_lieu_phuong_tien.objects.all()

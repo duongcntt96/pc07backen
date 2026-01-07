@@ -85,3 +85,18 @@ class Chung_loaiSerializer(serializers.ModelSerializer):
     def get_children(self,obj):
         serializer = Chung_loaiSerializer(instance=obj.children,many=True)
         return serializer.data
+
+# class Chung_loaiSerializer(serializers.ModelSerializer):
+#     # 'children' là related_name bạn đã định nghĩa trong Model
+#     children = serializers.SerializerMethodField(read_only=True)
+
+#     class Meta:
+#         model = Chung_loai
+#         fields = ['id', 'ten', 'maso', 'parent', 'children']
+
+#     def get_children(self, obj):
+#         # Chỉ lấy các con trực tiếp của node hiện tại
+#         children = obj.children.all()
+#         if children.exists():
+#             return Chung_loaiSerializer(children, many=True).data
+#         return []
