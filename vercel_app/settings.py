@@ -89,18 +89,20 @@ WSGI_APPLICATION = 'vercel_app.wsgi.application'
 
 # DATABASES = {}
 
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default="postgresql://postgres.esneqgycauidtjjvyanh:QWERTyuiopASDFGhjklZXCVBnm@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres",
+#         conn_max_age=600
+#     )
+# }
+
 DATABASES = {
     'default': dj_database_url.config(
-        default="postgresql://postgres.esneqgycauidtjjvyanh:QWERTyuiopASDFGhjklZXCVBnm@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres",
-        conn_max_age=600
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True # Supabase yêu cầu SSL
     )
 }
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
 # DATABASES = {
 #     'default': {
