@@ -98,7 +98,7 @@ WSGI_APPLICATION = 'vercel_app.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+        default=os.environ.get('DATABASE_URL',"postgresql://postgres.esneqgycauidtjjvyanh:QWERTyuiopASDFGhjklZXCVBnm@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"),
         conn_max_age=600,
         ssl_require=True # Supabase yêu cầu SSL
     )
