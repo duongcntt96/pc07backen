@@ -7,4 +7,4 @@ django-cors-headers==4.4.0
 psycopg2-binary==2.9.11
 Pillow==12.1.0
 djangorestframework-simplejwt
-django-filter==25.2
+django-filter==23.5
