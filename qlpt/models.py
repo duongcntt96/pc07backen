@@ -86,6 +86,7 @@ class Danh_muc_kho(models.Model):
     class Meta:
         verbose_name = "Danh mục kho"
         verbose_name_plural = "Danh mục kho"
+        ordering = ["id"]
 
     def __str__(self):
         return self.ten
