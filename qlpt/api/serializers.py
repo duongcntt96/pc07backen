@@ -66,22 +66,24 @@ class Phieu_nhap_Serializer(serializers.ModelSerializer):
             "nguon_cap",
             "phuong_tiens",
         )
-    
+
     def to_representation(self, instance):
         """
         Ghi đè hiển thị: Chỉ đưa các phương tiện GỐC (không có cha) vào mảng phuong_tiens.
-        Các phương tiện kèm theo sẽ tự động chui vào trong mục 'kemtheo' của phương tiện gốc 
+        Các phương tiện kèm theo sẽ tự động chui vào trong mục 'kemtheo' của phương tiện gốc
         nhờ vào Serializer đệ quy.
         """
         # 1. Lấy dữ liệu mặc định (đang bị lặp)
         representation = super().to_representation(instance)
-        
+
         # 2. Lọc lại queryset: Chỉ lấy những chi tiết có parent_item là NULL
         root_phuong_tiens = instance.phuong_tiens.filter(parent_item__isnull=True)
-        
+
         # 3. Gán lại dữ liệu đã lọc vào key 'phuong_tiens'
-        representation['phuong_tiens'] = Chi_tiet_phieu_nhap_Serializer(root_phuong_tiens, many=True).data
-        
+        representation["phuong_tiens"] = Chi_tiet_phieu_nhap_Serializer(
+            root_phuong_tiens, many=True
+        ).data
+
         return representation
 
     def create(self, validated_data):

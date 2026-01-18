@@ -39,175 +39,69 @@ class Text_to_speak(APIView):
         text = request.query_params.get('text')
         return Response({'data': text_to_mp3(text)})
 # Thống kê thực lực
-# class Thuc_luc(APIView):
-#     def get(self, request):
-#         # Filter params
-#         chung_loai = request.query_params.get('chung_loai')
-#         kho_nhap_id = request.query_params.get('kho_nhap')
-#         success_status = request.query_params.get('success', True)
-
-#         queryset = Chi_tiet_phieu_nhap.objects.all()
-
-#         # Build a list of all relevant kho_nhap (including children)
-#         if kho_nhap_id:
-#             try:
-#                 target_kho = Danh_muc_kho.objects.get(id=kho_nhap_id)
-#                 # Get all descendants of the target_kho
-#                 descendant_kho_ids = [target_kho.id]  # Include the target kho itself
-
-#                 # Recursive function to get all children
-#                 def get_children_ids(kho_item):
-#                     for child in kho_item.children.all():
-#                         descendant_kho_ids.append(child.id)
-#                         get_children_ids(child)
-
-#                 get_children_ids(target_kho)
-#                 queryset = queryset.filter(phieu_nhap__kho_nhap__in=descendant_kho_ids)
-
-#             except Danh_muc_kho.DoesNotExist:
-#                 return Response({'error': 'Kho nhập not found'}, status=status.HTTP_404_NOT_FOUND)
-
-#         # Filter by success status
-#         queryset = queryset.filter(phieu_nhap__success=success_status)
-
-#         # Annotate with import and export totals
-#         queryset = queryset.values('chung_loai__maso', 'chung_loai', 'ten').annotate(
-#             nhap_totals=Sum(
-#                 Case(
-#                     When(phieu_nhap__kho_nhap__in=descendant_kho_ids, then='so_luong'),
-#                     default=Value(0),
-#                     output_field=models.IntegerField()
-#                 )
-#             ),
-#             xuat_totals=Sum(
-#                 Case(
-#                     When(phieu_nhap__kho_xuat__in=descendant_kho_ids, then='so_luong'),
-#                     default=Value(0),
-#                     output_field=models.IntegerField()
-#                 )
-#             )
-#         ).annotate(
-#             totals=F('nhap_totals') - F('xuat_totals')
-#         ).filter(totals__gt=0).order_by('ten')
-
-#         # Filter by chung_loai
-#         if chung_loai:
-#             try:
-#                 ma_so = Chung_loai.objects.get(id=chung_loai).maso
-#                 queryset = queryset.filter(chung_loai__maso__icontains=ma_so)
-#             except Chung_loai.DoesNotExist:
-#                 return Response({'error': 'Chủng loại not found'}, status=status.HTTP_404_NOT_FOUND)
-
-#         _count = queryset.count()
-#         _sum = queryset.aggregate(total_sum=Sum('totals'))['total_sum'] or 0
-
-#         return Response({'kho_nhap': kho_nhap_id, 'sum': _sum, 'count': _count, 'data': list(queryset)}, status=status.HTTP_200_OK)
-from django.db.models import (
-    Sum, Case, When, Value, IntegerField,
-    F, Q
-)
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-
-
 class Thuc_luc(APIView):
     def get(self, request):
+        # Filter params
         chung_loai = request.query_params.get('chung_loai')
         kho_nhap_id = request.query_params.get('kho_nhap')
-        success_param = request.query_params.get('success', 'true')
+        success_status = request.query_params.get('success', True)
 
-        # ---- FIX boolean ----
-        success_status = True if str(success_param).lower() == 'true' else False
+        queryset = Chi_tiet_phieu_nhap.objects.all()
 
-        queryset = Chi_tiet_phieu_nhap.objects.filter(
-            phieu_nhap__success=success_status
-        )
-
-        # ---- INIT descendant_kho_ids (QUAN TRỌNG) ----
-        descendant_kho_ids = []
-
-        # ---- BUILD KHO TREE (1 QUERY nếu dùng MPTT) ----
+        # Build a list of all relevant kho_nhap (including children)
         if kho_nhap_id:
             try:
                 target_kho = Danh_muc_kho.objects.get(id=kho_nhap_id)
+                # Get all descendants of the target_kho
+                descendant_kho_ids = [target_kho.id]  # Include the target kho itself
 
-                # Nếu có MPTT / nested set
-                if hasattr(target_kho, 'lft'):
-                    descendant_kho_ids = (
-                        Danh_muc_kho.objects.filter(
-                            tree_id=target_kho.tree_id,
-                            lft__gte=target_kho.lft,
-                            rght__lte=target_kho.rght
-                        ).values_list('id', flat=True)
-                    )
-                else:
-                    # fallback: BFS (ít query hơn đệ quy)
-                    stack = [target_kho]
-                    while stack:
-                        node = stack.pop()
-                        descendant_kho_ids.append(node.id)
-                        stack.extend(list(node.children.all()))
+                # Recursive function to get all children
+                def get_children_ids(kho_item):
+                    for child in kho_item.children.all():
+                        descendant_kho_ids.append(child.id)
+                        get_children_ids(child)
 
-                # ---- FILTER SỚM để giảm dataset ----
-                queryset = queryset.filter(
-                    Q(phieu_nhap__kho_nhap__in=descendant_kho_ids) |
-                    Q(phieu_nhap__kho_xuat__in=descendant_kho_ids)
-                )
+                get_children_ids(target_kho)
+                queryset = queryset.filter(phieu_nhap__kho_nhap__in=descendant_kho_ids)
 
             except Danh_muc_kho.DoesNotExist:
-                return Response(
-                    {'error': 'Kho nhập not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({'error': 'Kho nhập not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # ---- GROUP + ANNOTATE (TỐI ƯU) ----
-        queryset = queryset.values(
-            'chung_loai',
-            'chung_loai__maso',
-            'ten'
-        ).annotate(
+        # Filter by success status
+        queryset = queryset.filter(phieu_nhap__success=success_status)
 
+        # Annotate with import and export totals
+        queryset = queryset.values('chung_loai__maso', 'chung_loai', 'ten').annotate(
             nhap_totals=Sum(
-                'so_luong',
-                filter=Q(phieu_nhap__kho_nhap__in=descendant_kho_ids)
+                Case(
+                    When(phieu_nhap__kho_nhap__in=descendant_kho_ids, then='so_luong'),
+                    default=Value(0),
+                    output_field=models.IntegerField()
+                )
             ),
-
             xuat_totals=Sum(
-                'so_luong',
-                filter=Q(phieu_nhap__kho_xuat__in=descendant_kho_ids)
+                Case(
+                    When(phieu_nhap__kho_xuat__in=descendant_kho_ids, then='so_luong'),
+                    default=Value(0),
+                    output_field=models.IntegerField()
+                )
             )
-
         ).annotate(
             totals=F('nhap_totals') - F('xuat_totals')
-        ).filter(
-            totals__gt=0
-        ).order_by('ten')
+        ).filter(totals__gt=0).order_by('ten')
 
-        # ---- FILTER CHUNG LOAI (GIỮ NGUYÊN LOGIC) ----
+        # Filter by chung_loai
         if chung_loai:
             try:
                 ma_so = Chung_loai.objects.get(id=chung_loai).maso
                 queryset = queryset.filter(chung_loai__maso__icontains=ma_so)
             except Chung_loai.DoesNotExist:
-                return Response(
-                    {'error': 'Chủng loại not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({'error': 'Chủng loại not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # ---- SUMMARY ----
         _count = queryset.count()
-        _sum = queryset.aggregate(
-            total_sum=Sum('totals')
-        )['total_sum'] or 0
+        _sum = queryset.aggregate(total_sum=Sum('totals'))['total_sum'] or 0
 
-        return Response({
-            'kho_nhap': kho_nhap_id,
-            'sum': _sum,
-            'count': _count,
-            'data': list(queryset)
-        }, status=status.HTTP_200_OK)
-
+        return Response({'kho_nhap': kho_nhap_id, 'sum': _sum, 'count': _count, 'data': list(queryset)}, status=status.HTTP_200_OK)
 
 class Ton_kho(APIView):
     def get(self, request):
