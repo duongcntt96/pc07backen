@@ -171,7 +171,8 @@ class Tai_lieu_phuong_tien_viewSet(viewsets.ModelViewSet):
     # permission_classes = [permissions.IsAuthenticated]
 
 class Phieu_nhap_ViewSet(viewsets.ModelViewSet):
-    queryset = Phieu_nhap.objects.all()
+    # queryset = Phieu_nhap.objects.all()
+    queryset = Phieu_nhap.objects.prefetch_related('phuong_tiens__kemtheo').all()
     serializer_class = Phieu_nhap_Serializer
     pagination_class = CustomPagination
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -179,7 +180,7 @@ class Phieu_nhap_ViewSet(viewsets.ModelViewSet):
                         'phuong_tiens__chung_loai', 'phuong_tiens__nguon_cap',
                         'phuong_tiens__ten']
     search_fields = ['phuong_tiens__ten']
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    # permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         return get_queryset__datetime_filter(self,Phieu_nhap.objects,'thoi_gian')
