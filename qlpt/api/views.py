@@ -109,14 +109,34 @@ class Ton_kho(APIView):
             return e['id']
         if (request.query_params.get('export_from')):
             kho = request.query_params.get('export_from')
-            List_PT_nhap = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_nhap=kho,phieu_nhap__success=True).values('id','chung_loai', 'ten','nguon_cap','nam_cap','nguyen_gia',).annotate(totals = Sum('so_luong'))
-            List_PT_xuat = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_xuat=kho,phieu_nhap__success=True).values('chung_loai', 'ten','nguon_cap','nam_cap','nguyen_gia',).annotate(totals = Sum('so_luong'))
-            _result = []
+            List_PT_nhap = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_nhap=kho,phieu_nhap__success=True,parent_item__isnull=True).prefetch_related('kemtheo')
+            List_PT_xuat = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_xuat=kho,phieu_nhap__success=True,parent_item__isnull=True).prefetch_related('kemtheo')
+            
+            # Group nhap items by key attributes
+            nhap_dict = {}
             for pt in List_PT_nhap:
-                _xuat = List_PT_xuat.filter(chung_loai=pt['chung_loai'],ten=pt['ten'],nguon_cap=pt['nguon_cap'],nam_cap=pt['nam_cap'],nguyen_gia=pt['nguyen_gia'],)
-                if _xuat:
-                    pt['totals'] = pt['totals']-_xuat[0]['totals']
-                _result.append(pt)
+                key = (pt.chung_loai_id, pt.ten, pt.nguon_cap_id, pt.nam_cap, pt.nguyen_gia)
+                if key not in nhap_dict:
+                    nhap_dict[key] = {
+                        'id': pt.id,
+                        'chung_loai': pt.chung_loai_id,
+                        'ten': pt.ten,
+                        'nguon_cap': pt.nguon_cap_id,
+                        'nam_cap': pt.nam_cap,
+                        'nguyen_gia': pt.nguyen_gia,
+                        'kemtheo': [{'id': k.id,'chung_loai': k.chung_loai_id, 'ten': k.ten, 'so_luong': k.so_luong} for k in pt.kemtheo.all()],
+                        'totals': pt.so_luong
+                    }
+                else:
+                    nhap_dict[key]['totals'] += pt.so_luong
+            
+            # Subtract xuat from nhap
+            for pt in List_PT_xuat:
+                key = (pt.chung_loai_id, pt.ten, pt.nguon_cap_id, pt.nam_cap, pt.nguyen_gia)
+                if key in nhap_dict:
+                    nhap_dict[key]['totals'] -= pt.so_luong
+            
+            _result = list(nhap_dict.values())
             _result.sort(key=sapxetheoID)
             return Response({'data': list(_result)}, status=status.HTTP_200_OK)
         return Response({'data': []}, status=status.HTTP_200_OK)
