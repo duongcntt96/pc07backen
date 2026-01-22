@@ -33,17 +33,23 @@ class Tai_lieu_phuong_tien_Serializer(serializers.ModelSerializer):
         model = Tai_lieu_phuong_tien
         fields = ("id", "ten", "chung_loai", "files")
 
-
+class Chi_tiet_kemtheo_Serializer(serializers.ModelSerializer):
+    """Serializer tối giản để tránh load lại các FK không cần thiết"""
+    class Meta:
+        model = Chi_tiet_phieu_nhap
+        # Chỉ liệt kê những gì cần hiển thị ở bảng kèm theo
+        fields = ['id', 'chung_loai', 'ten', 'so_luong',]
 class Chi_tiet_phieu_nhap_Serializer(serializers.ModelSerializer):
     class Meta:
         model = Chi_tiet_phieu_nhap
-        fields = "__all__"
+        fields = ['id', 'chung_loai', 'ten', 'so_luong','nguon_cap','nguyen_gia','nam_cap']
+        # fields = "__all__"
 
     def get_fields(self):
         # Gọi phương thức cha để lấy các field mặc định
         fields = super().get_fields()
         # Thêm field đệ quy vào đây
-        fields["kemtheo"] = Chi_tiet_phieu_nhap_Serializer(
+        fields["kemtheo"] = Chi_tiet_kemtheo_Serializer(
             many=True,
             required=False,
         )
@@ -68,20 +74,17 @@ class Phieu_nhap_Serializer(serializers.ModelSerializer):
         )
 
     def to_representation(self, instance):
-        """
-        Ghi đè hiển thị: Chỉ đưa các phương tiện GỐC (không có cha) vào mảng phuong_tiens.
-        Các phương tiện kèm theo sẽ tự động chui vào trong mục 'kemtheo' của phương tiện gốc
-        nhờ vào Serializer đệ quy.
-        """
-        # 1. Lấy dữ liệu mặc định (đang bị lặp)
         representation = super().to_representation(instance)
 
-        # 2. Lọc lại queryset: Chỉ lấy những chi tiết có parent_item là NULL
-        root_phuong_tiens = instance.phuong_tiens.filter(parent_item__isnull=True)
+        # LẤY TỪ CACHE: prefetch_related đã đưa hết phuong_tiens vào memory
+        all_phuong_tiens = instance.phuong_tiens.all()
+        
+        # LỌC BẰNG PYTHON: Không dùng .filter() của database
+        root_items = [item for item in all_phuong_tiens if item.parent_item_id is None]
 
-        # 3. Gán lại dữ liệu đã lọc vào key 'phuong_tiens'
+        # Gán lại dữ liệu
         representation["phuong_tiens"] = Chi_tiet_phieu_nhap_Serializer(
-            root_phuong_tiens, many=True
+            root_items, many=True, context=self.context
         ).data
 
         return representation

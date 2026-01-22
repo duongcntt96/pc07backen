@@ -200,6 +200,98 @@ class Thuc_luc(APIView):
 
 #         return Response({'kho_nhap': kho_nhap_id, 'sum': _sum, 'count': _count, 'data': list(queryset)}, status=status.HTTP_200_OK)
 
+class PhanBoThucLucChiTiet(APIView):
+    def get(self, request):
+        kho_goc_id = request.query_params.get('kho_id')
+        # Thêm filter param
+        chung_loai_id = request.query_params.get('chung_loai')
+        # Lọc theo chủng loại nếu có yêu cầu
+        if chung_loai_id:
+            try:
+                ma_so = Chung_loai.objects.get(id=chung_loai_id).maso
+                # queryset = queryset.filter(chung_loai__maso__icontains=ma_so)
+            except Chung_loai.DoesNotExist:
+                return Response({'error': 'Chủng loại không tồn tại'}, status=404)
+        search_name = request.query_params.get('q') # Tìm theo tên hoặc mã
+
+        if not kho_goc_id:
+            return Response({'error': 'Vui lòng cung cấp kho_id'}, status=400)
+
+        try:
+            kho_goc = Danh_muc_kho.objects.get(id=kho_goc_id)
+            kho_con_list = list(Danh_muc_kho.objects.filter(parent_id=kho_goc_id)) + [kho_goc]
+            
+            kho_mapping = {}
+            for k in kho_con_list:
+                kho_mapping[k.id] = [k.id] if k.id == kho_goc.id else self.get_all_descendants(k.id)
+
+            all_relevant_ids = [idx for sublist in kho_mapping.values() for idx in sublist]
+
+            # 1. Khởi tạo QuerySet cơ bản
+            queryset = Chi_tiet_phieu_nhap.objects.filter(
+                phieu_nhap__success=True
+            ).filter(
+                Q(phieu_nhap__kho_nhap__in=all_relevant_ids) | 
+                Q(phieu_nhap__kho_xuat__in=all_relevant_ids)
+            )
+
+            # 2. ÁP DỤNG FILTER TẠI ĐÂY
+            if chung_loai_id:
+                queryset = queryset.filter(chung_loai__maso__icontains=ma_so)
+            
+            if search_name:
+                queryset = queryset.filter(
+                    Q(chung_loai__ten__icontains=search_name) | 
+                    Q(chung_loai__maso__icontains=search_name)
+                )
+
+            # 3. Lấy dữ liệu đã filter
+            raw_stats = queryset.values(
+                'chung_loai_id', 'chung_loai__maso', 'chung_loai__ten',
+                'phieu_nhap__kho_nhap_id', 'phieu_nhap__kho_xuat_id', 'so_luong'
+            )
+
+            # --- Logic xử lý matrix (như bản trước) ---
+            matrix = {}
+            for item in raw_stats:
+                cl_id = item['chung_loai_id']
+                if cl_id not in matrix:
+                    matrix[cl_id] = {
+                        'maso': item['chung_loai__maso'],
+                        'ten_chung_loai': item['chung_loai__ten'],
+                        'chi_tiet_kho': {k.id: 0 for k in kho_con_list},
+                        'tong_cong': 0
+                    }
+
+                for k_id, sub_ids in kho_mapping.items():
+                    if item['phieu_nhap__kho_nhap_id'] in sub_ids:
+                        matrix[cl_id]['chi_tiet_kho'][k_id] += item['so_luong']
+                    if item['phieu_nhap__kho_xuat_id'] in sub_ids:
+                        matrix[cl_id]['chi_tiet_kho'][k_id] -= item['so_luong']
+
+            final_data = []
+            for cl_id, info in matrix.items():
+                info['tong_cong'] = sum(info['chi_tiet_kho'].values())
+                # Có thể bỏ filter ton__gt=0 nếu muốn xem cả hàng đã hết
+                if info['tong_cong'] != 0: 
+                    final_data.append(info)
+
+            return Response({
+                'don_vi_goc': kho_goc.ten,
+                'danh_sach_kho': [{'id': k.id, 'ten': k.ten} for k in kho_con_list],
+                'data': sorted(final_data, key=lambda x: x['maso'])
+            }, status=200)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    def get_all_descendants(self, parent_id):
+        descendants = [parent_id]
+        children = Danh_muc_kho.objects.filter(parent_id=parent_id).values_list('id', flat=True)
+        for child_id in children:
+            descendants.extend(self.get_all_descendants(child_id))
+        return descendants
+
 class Ton_kho(APIView):
     def get(self, request):
         def sapxetheoID(e):
@@ -288,7 +380,8 @@ class Tai_lieu_phuong_tien_viewSet(viewsets.ModelViewSet):
 
 class Phieu_nhap_ViewSet(viewsets.ModelViewSet):
     # queryset = Phieu_nhap.objects.all()
-    queryset = Phieu_nhap.objects.prefetch_related('phuong_tiens__kemtheo').all()
+    queryset = Phieu_nhap.objects
+    # .prefetch_related('phuong_tiens__kemtheo').all()
     serializer_class = Phieu_nhap_Serializer
     pagination_class = CustomPagination
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -299,7 +392,18 @@ class Phieu_nhap_ViewSet(viewsets.ModelViewSet):
     # permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        return get_queryset__datetime_filter(self,Phieu_nhap.objects,'thoi_gian')
+        # 1. Gọi hàm filter thời gian của bạn
+        qs = get_queryset__datetime_filter(self, Phieu_nhap.objects, 'thoi_gian')
+        
+        # 2. Áp dụng Prefetch và Select related NGAY TẠI ĐÂY
+        return qs.select_related(
+            'kho_nhap', 
+            'kho_xuat', 
+            'nguon_cap'
+        ).prefetch_related(
+            'phuong_tiens__chung_loai', # Quan trọng: Load luôn chủng loại để serializer không query lẻ
+            'phuong_tiens__kemtheo'     # Load đệ quy
+        ).distinct() # Đảm bảo không trùng lặp khi filter qua quan hệ N-N
 
 class Chi_tiet_phieu_nhap_ViewSet(viewsets.ModelViewSet):
     # List phiếu nhập có trạng thái success
