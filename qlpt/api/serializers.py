@@ -2,6 +2,8 @@ from rest_framework import serializers
 from ..models import PhuongTienHuHong
 from django.db import transaction
 
+from qlpt import models
+from django.db.models import Sum
 
 class PhuongTienHuHongSerializer(serializers.ModelSerializer):
     class Meta:
@@ -74,20 +76,48 @@ class Phieu_nhap_Serializer(serializers.ModelSerializer):
         )
 
     def to_representation(self, instance):
+        request = self.context.get('request')
+        if request and request.method in ['PUT', 'PATCH']:
+            # Trả về cực ít dữ liệu để kết thúc request ngay lập tức
+            return {
+                'id': instance.id,
+                'success': True,
+                'message': 'Cập nhật thành công và đã tối ưu hóa dữ liệu trả về.'
+            }
         representation = super().to_representation(instance)
-
         # LẤY TỪ CACHE: prefetch_related đã đưa hết phuong_tiens vào memory
         all_phuong_tiens = instance.phuong_tiens.all()
-        
         # LỌC BẰNG PYTHON: Không dùng .filter() của database
         root_items = [item for item in all_phuong_tiens if item.parent_item_id is None]
-
         # Gán lại dữ liệu
         representation["phuong_tiens"] = Chi_tiet_phieu_nhap_Serializer(
             root_items, many=True, context=self.context
         ).data
 
         return representation
+    def validate(self, data):
+        kho_xuat = data.get('kho_xuat')
+        phuong_tiens = data.get('phuong_tiens', [])
+
+        if kho_xuat:
+            for pt in phuong_tiens:
+                # Chỉ chạy query kiểm tra nếu là kho xuất
+                cl = pt.get('chung_loai')
+                ten = pt.get('ten')
+                sl_dang_xuat = pt.get('so_luong')
+
+                # Tính tồn kho (Tối ưu: gom các query này lại nếu có thể)
+                stats = Chi_tiet_phieu_nhap.objects.filter(
+                    chung_loai=cl, ten=ten, phieu_nhap__success=True
+                ).aggregate(
+                    tong_nhap=Sum('so_luong', filter=models.Q(phieu_nhap__kho_nhap=kho_xuat)),
+                    tong_xuat=Sum('so_luong', filter=models.Q(phieu_nhap__kho_xuat=kho_xuat))
+                )
+                
+                ton_kho = (stats['tong_nhap'] or 0) - (stats['tong_xuat'] or 0)
+                if sl_dang_xuat > ton_kho:
+                    raise serializers.ValidationError(f"Sản phẩm {ten} không đủ tồn kho (Còn: {ton_kho})")
+        return data
 
     def create(self, validated_data):
         chitiets_data = validated_data.pop("phuong_tiens", [])
@@ -127,29 +157,48 @@ class Phieu_nhap_Serializer(serializers.ModelSerializer):
         phuong_tiens_data = validated_data.pop("phuong_tiens", None)
 
         with transaction.atomic():
-            # Cập nhật các trường thông tin chung của Phiếu nhập
             instance = super().update(instance, validated_data)
 
             if phuong_tiens_data is not None:
-                # Xóa dữ liệu cũ
+                # Xóa nhanh
                 instance.phuong_tiens.all().delete()
 
-                # Tạo mới lại y hệt logic hàm create
+                pt_chinh_objs = []
+                kt_raw_data = []
+
                 for chitiet in phuong_tiens_data:
-                    kemtheo_data = chitiet.pop("kemtheo", [])
-                    chitiet.pop("phieu_nhap", None)
+                    kemtheo_list = chitiet.pop("kemtheo", [])
+                    
+                    # Chuyển object thành ID để bulk_create nhanh hơn
+                    clean_data = {}
+                    for key, value in chitiet.items():
+                        if key in ['phieu_nhap', 'parent_item']: continue
+                        # Nếu value là object model, lấy .id
+                        clean_data[f"{key}_id" if hasattr(value, 'id') else key] = value.id if hasattr(value, 'id') else value
 
-                    pt_chinh = Chi_tiet_phieu_nhap.objects.create(
-                        phieu_nhap=instance, **chitiet
-                    )
+                    pt_chinh_objs.append(Chi_tiet_phieu_nhap(phieu_nhap=instance, **clean_data))
+                    kt_raw_data.append(kemtheo_list)
 
-                    for kt in kemtheo_data:
-                        kt.pop("phieu_nhap", None)
-                        kt.pop("parent_item", None)
-                        kt.pop("kemtheo", None)
-                        Chi_tiet_phieu_nhap.objects.create(
-                            parent_item=pt_chinh, phieu_nhap=instance, **kt
-                        )
+                # Bulk Create root items
+                created_pts = Chi_tiet_phieu_nhap.objects.bulk_create(pt_chinh_objs)
+
+                # Bulk Create children
+                kt_objs = []
+                for i, pt_chinh in enumerate(created_pts):
+                    for kt in kt_raw_data[i]:
+                        clean_kt = {}
+                        for k, v in kt.items():
+                            if k in ['phieu_nhap', 'parent_item', 'kemtheo']: continue
+                            clean_kt[f"{k}_id" if hasattr(v, 'id') else k] = v.id if hasattr(v, 'id') else v
+                        
+                        kt_objs.append(Chi_tiet_phieu_nhap(
+                            parent_item=pt_chinh, 
+                            phieu_nhap=instance, 
+                            **clean_kt
+                        ))
+                
+                if kt_objs:
+                    Chi_tiet_phieu_nhap.objects.bulk_create(kt_objs)
 
         return instance
 

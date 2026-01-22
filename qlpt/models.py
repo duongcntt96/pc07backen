@@ -148,10 +148,10 @@ class Phieu_nhap(models.Model):
 
 class Chi_tiet_phieu_nhap(models.Model):
     phieu_nhap = models.ForeignKey(
-        Phieu_nhap, related_name="phuong_tiens", on_delete=models.CASCADE, null=True
+        Phieu_nhap, related_name="phuong_tiens", on_delete=models.CASCADE, null=True,
     )
     chung_loai = models.ForeignKey(
-        Chung_loai, verbose_name="Chủng loại", on_delete=models.RESTRICT
+        Chung_loai, verbose_name="Chủng loại", on_delete=models.RESTRICT,
     )
     parent_item = models.ForeignKey(
         "self",
@@ -194,24 +194,24 @@ class Chi_tiet_phieu_nhap(models.Model):
     def __str__(self):
         return self.ten
 
-    def save(self, *args, **kwargs):
-        if self.phieu_nhap.kho_xuat:
-            nhap = Chi_tiet_phieu_nhap.objects.filter(
-                phieu_nhap__kho_nhap=self.phieu_nhap.kho_xuat,
-                chung_loai=self.chung_loai,
-                ten=self.ten,
-            ).aggregate(totals=Sum("so_luong"))
-            xuat = Chi_tiet_phieu_nhap.objects.filter(
-                phieu_nhap__kho_xuat=self.phieu_nhap.kho_xuat,
-                chung_loai=self.chung_loai,
-                ten=self.ten,
-            ).aggregate(totals=Sum("so_luong"))
-            if self.so_luong > ((nhap["totals"] or 0) - (xuat["totals"] or 0)):
-                raise Exception("Không đủ hàng tồn kho để xuất")
-            else:
-                super(Chi_tiet_phieu_nhap, self).save(*args, **kwargs)
-        else:
-            super(Chi_tiet_phieu_nhap, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     if self.phieu_nhap.kho_xuat:
+    #         nhap = Chi_tiet_phieu_nhap.objects.filter(
+    #             phieu_nhap__kho_nhap=self.phieu_nhap.kho_xuat,
+    #             chung_loai=self.chung_loai,
+    #             ten=self.ten,
+    #         ).aggregate(totals=Sum("so_luong"))
+    #         xuat = Chi_tiet_phieu_nhap.objects.filter(
+    #             phieu_nhap__kho_xuat=self.phieu_nhap.kho_xuat,
+    #             chung_loai=self.chung_loai,
+    #             ten=self.ten,
+    #         ).aggregate(totals=Sum("so_luong"))
+    #         if self.so_luong > ((nhap["totals"] or 0) - (xuat["totals"] or 0)):
+    #             raise Exception("Không đủ hàng tồn kho để xuất")
+    #         else:
+    #             super(Chi_tiet_phieu_nhap, self).save(*args, **kwargs)
+    #     else:
+    #         super(Chi_tiet_phieu_nhap, self).save(*args, **kwargs)
 
 
 class Tai_lieu_phuong_tien(models.Model):
