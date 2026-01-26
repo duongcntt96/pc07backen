@@ -292,11 +292,39 @@ class PhanBoThucLucChiTiet(APIView):
             descendants.extend(self.get_all_descendants(child_id))
         return descendants
 
+# class Ton_kho(APIView):
+#     def get(self, request):
+#         kho_id = request.query_params.get('export_from')
+#         if not kho_id:
+#             return Response({'data': []}, status=status.HTTP_200_OK)
+#         # Query gộp: Tính cả Nhập và Xuất trong 1 câu lệnh duy nhất
+#         ton_kho_qs = Chi_tiet_phieu_nhap.objects.filter(
+#             phieu_nhap__success=True,
+#             parent_item__isnull=True
+#         ).filter(
+#             # Lọc những phiếu liên quan đến kho này (hoặc là kho nhập, hoặc là kho xuất)
+#             models.Q(phieu_nhap__kho_nhap=kho_id) | models.Q(phieu_nhap__kho_xuat=kho_id)
+#         ).values(
+#             # Group by các trường này
+#             'chung_loai_id', 'ten', 'nguon_cap_id', 'nam_cap', 'nguyen_gia'
+#         ).annotate(
+#             # Logic: Nếu là kho nhập thì +số lượng, nếu là kho xuất thì -số lượng
+#             totals=Sum(
+#                 Case(
+#                     When(phieu_nhap__kho_nhap=kho_id, then=F('so_luong')),
+#                     When(phieu_nhap__kho_xuat=kho_id, then=-F('so_luong')),
+#                     default=Value(0),
+#                     output_field=IntegerField(),
+#                 )
+#             )
+#         ).filter(totals__gt=0).order_by('chung_loai_id') # Chỉ lấy hàng còn tồn
+#         return Response({'data': list(ton_kho_qs)}, status=status.HTTP_200_OK)
+
 class Ton_kho(APIView):
     def get(self, request):
         def sapxetheoID(e):
             return e['id']
-        kho = request.query_params.get('kho_id')
+        kho = request.query_params.get('export_from')
         if (kho):
             List_PT_nhap = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_nhap=kho,phieu_nhap__success=True,parent_item__isnull=True).prefetch_related('kemtheo')
             List_PT_xuat = Chi_tiet_phieu_nhap.objects.filter(phieu_nhap__kho_xuat=kho,phieu_nhap__success=True,parent_item__isnull=True).prefetch_related('kemtheo')
@@ -380,8 +408,7 @@ class Tai_lieu_phuong_tien_viewSet(viewsets.ModelViewSet):
 
 class Phieu_nhap_ViewSet(viewsets.ModelViewSet):
     # queryset = Phieu_nhap.objects.all()
-    queryset = Phieu_nhap.objects
-    # .prefetch_related('phuong_tiens__kemtheo').all()
+    queryset = Phieu_nhap.objects.prefetch_related('phuong_tiens__kemtheo').all()
     serializer_class = Phieu_nhap_Serializer
     pagination_class = CustomPagination
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
